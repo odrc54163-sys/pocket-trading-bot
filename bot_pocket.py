@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from threading import Thread
 import time
@@ -6,20 +6,19 @@ import pytz
 from flask import Flask
 import pandas as pd
 import telebot
-import yfinance as yf  # Librería para obtener datos financieros reales
-
-# Configura tu token y chat ID
-TOKEN = '8836340643:AAGDEy9Q-4KRpjPuyiiFLtsQcmdZPlFI2PY'
-CHAT_ID = '2140660100'
+import yfinance as yf
+Zy
+TOKEN = "8836340643:AAGDEy9Q-4KRpjPuyiiFLtsQcmdZPlFI2PY"
+CHAT_ID = "2140660100"
 bot = telebot.TeleBot(TOKEN)
 
-# 1. Configurar servidor web para Render y UptimeRobot
+# 1. Servidor web para mantener activo el bot en Render
 app = Flask('')
 
 
 @app.route('/')
 def home():
-  return '¡El bot de análisis de mercado está activo!'
+  return '¡El bot multimoneda está activo!'
 
 
 def run():
@@ -32,11 +31,24 @@ def keep_alive():
   t.start()
 
 
-# 2. Función para enviar la señal con tu formato exacto
+# 2. Función que calcula automáticamente el minuto y segundo exacto de entrada
 def enviar_senal(chat_id, activo, direccion, tiempo):
   tz = pytz.timezone('America/Caracas')
   ahora = datetime.now(tz)
-  hora_actual = f"{ahora.strftime('%I').lstrip('0')}:{ahora.strftime('%M %p')}"
+
+  # Calcular automáticamente el siguiente minuto múltiplo de 5 para la vela
+  minuto_actual = ahora.minute
+  resto = minuto_actual % 5
+  minutos_a_sumar = 5 - resto if resto != 0 else 5
+
+  # Siguiente tiempo exacto de entrada (con segundos en 00)
+  siguiente_tiempo = ahora.replace(
+      second=0, microsecond=0
+  ) + timedelta(minutes=minutos_a_sumar)
+  hora_entrada = f"{siguiente_tiempo.strftime('%I').lstrip('0')}:{siguiente_tiempo.strftime('%M:%S %p')}"
+
+  # Hora en que se mandó el mensaje
+  hora_envio = f"{ahora.strftime('%I').lstrip('0')}:{ahora.strftime('%M %p')}"
 
   if direccion.lower() == 'subida':
     emoji_dir = '🟢'
@@ -50,13 +62,14 @@ def enviar_senal(chat_id, activo, direccion, tiempo):
       f'{emoji_dir} **{accion}** {emoji_dir}\n\n'
       f'💱 **Moneda:** {activo.upper()}\n'
       f'⏱️ **Tiempo / Expiración:** {tiempo}\n'
-      f'⏰ **Hora de envío:** {hora_actual}'
+      f'🎯 **Entrada exacta:** A las **{hora_entrada}** (Segundo 00)\n'
+      f'⏰ **Hora de envío:** {hora_envio}'
   )
 
   bot.send_message(chat_id, mensaje, parse_mode='Markdown')
 
 
-# 3. Función para calcular el RSI (Indicador Técnico)
+# 3. Cálculo matemático interno del bot (RSI)
 def calcular_rsi(data, window=14):
   delta = data['Close'].diff()
   gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
@@ -66,58 +79,56 @@ def calcular_rsi(data, window=14):
   return rsi
 
 
-# 4. Bucle de análisis de mercado en tiempo real
+# 4. Analizador automático de múltiples monedas
 def analizar_mercado():
-  # Activo que vamos a vigilar en el mercado global (compatible con Pocket Option)
-  activo = 'EURUSD=X'
-  nombre_mostrar = 'EURUSD'
+  pares = {
+      'EURUSD=X': 'EURUSD',
+      'GBPUSD=X': 'GBPUSD',
+      'USDJPY=X': 'USDJPY',
+      'AUDUSD=X': 'AUDUSD',
+      'USDCAD=X': 'USDCAD',
+      'EURJPY=X': 'EURJPY',
+      'GBPJPY=X': 'GBPJPY',
+  }
 
-  # Espera un momento al encender para estabilizar el servidor
   time.sleep(15)
 
   while True:
-    try:
-      # Descarga datos recientes de las últimas horas (velas de 1 minuto o 5 minutos)
-      df = yf.download(
-          activo, period='1d', interval='5m', progress=False
-      )
+    for ticker, nombre in pares.items():
+      try:
+        df = yf.download(ticker, period='1d', interval='5m', progress=False)
 
-      if not df.empty and len(df) > 20:
-        # Calcular RSI
-        df['RSI'] = calcular_rsi(df)
-        ultimo_rsi = df['RSI'].iloc[-1]
+        if not df.empty and len(df) > 20:
+          df['RSI'] = calcular_rsi(df)
+          ultimo_rsi = df['RSI'].iloc[-1]
 
-        print(f'Analizando {nombre_mostrar} - RSI actual: {ultimo_rsi:.2f}')
+          print(f'Revisando {nombre} - RSI: {ultimo_rsi:.2f}')
 
-        # Regla de estrategia:
-        # Si RSI < 30 (Sobreventa -> El precio cayó mucho, probable subida)
-        if ultimo_rsi < 30:
-          enviar_senal(CHAT_ID, nombre_mostrar, 'subida', '5M')
-          # Esperar 15 minutos para no repetir señal seguida en el mismo activo
-          time.sleep(900)
+          if ultimo_rsi < 30:
+            enviar_senal(CHAT_ID, nombre, 'subida', '5M')
+            time.sleep(300)
 
-        # Si RSI > 70 (Sobrecompra -> El precio subió mucho, probable baja)
-        elif ultimo_rsi > 70:
-          enviar_senal(CHAT_ID, nombre_mostrar, 'baja', '5M')
-          time.sleep(900)
+          elif ultimo_rsi > 70:
+            enviar_senal(CHAT_ID, nombre, 'baja', '5M')
+            time.sleep(300)
 
-      # Revisa el mercado cada 60 segundos
-      time.sleep(60)
+        time.sleep(10)
 
-    except Exception as e:
-      print(f'Error en el análisis de mercado: {e}')
-      time.sleep(60)
+      except Exception as e:
+        print(f'Error en {nombre}: {e}')
+        time.sleep(5)
+
+    time.sleep(30)
 
 
-# 5. Punto de entrada principal
+# 5. Inicio del programa principal
 if __name__ == '__main__':
   keep_alive()
 
-  # Iniciar el hilo de análisis técnico en segundo plano
   hilo_analisis = Thread(target=analizar_mercado)
   hilo_analisis.daemon = True
   hilo_analisis.start()
 
   bot.remove_webhook()
-  print('Iniciando bot analista de mercado y servidor web...')
+  print('Iniciando bot analista multimoneda y servidor web...')
   bot.infinity_polling()
