@@ -6,7 +6,7 @@ from flask import Flask
 import telebot
 
 # Configura tu token de Telegram aquí
-TOKEN = '8836340643:AAEq-FgcW6JZU-3-XouhUzBFjleGB-X8Sj8'
+TOKEN = '8836340643:AAELtdRqcjPzL60PG1JBZy32TwWy0cVMF5Q'
 CHAT_ID = "2140660100"
 bot = telebot.TeleBot(TOKEN)
 
