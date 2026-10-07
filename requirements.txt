@@ -1,3 +1,5 @@
 pyTelegramBotAPI
 Flask
 pytz
+yfinance
+pandas
