@@ -1,60 +1,89 @@
-import time
+import os
 from datetime import datetime
+from threading import Thread
+import pytz
+from flask import Flask
 import telebot
 
-# --- TUS DATOS ---
-TOKEN = "8836340643:AAEq-FgcW6JZU-3-XouhUzBFjleGB-X8Sj8"
-CHAT_ID = "2140660100"
-
+# Configura tu token de Telegram aquí
+TOKEN = '2140660100'
 bot = telebot.TeleBot(TOKEN)
 
-print("--- BOT DE SEÑALES POCKET OPTION ACTIVO ---")
+# 1. Configurar mini servidor web con Flask para Render y UptimeRobot
+app = Flask('')
 
-while True:
-    ahora = datetime.now()
-    minuto = ahora.minute
-    segundo = ahora.second
 
-    # Detecta el momento exacto (3 minutos antes de un ciclo de 5 minutos)
-    if (minuto + 3) % 5 == 0 and segundo == 0:
-        
-        # --- MENSAJE 1: Aviso de preparación (3 minutos antes) ---
-        mensaje_preparacion = (
-            "⚠️ **¡ATENCIÓN!** ⚠️\n"
-            "Mantente pendiente, en 3 minutos te pasaré la señal exacta para operar en Pocket Option."
-        )
-        
-        bot.send_message(CHAT_ID, mensaje_preparacion, parse_mode="Markdown")
-        print("[1] Aviso de preparación enviado a Telegram.")
-        
-        # Esperamos exactamente 2 minutos con 50 segundos (170 segundos)
-        time.sleep(170)
-        
-        # --- MENSAJE 2: La señal exacta limpia con emojis dinámicos ---
-        activo = "EUR/USD"
-        momento_entrada = "Segundo 30" 
-        
-        # Puedes cambiar esto a "SUBIDA" o "BAJADA" según lo que analice tu lógica
-        accion = "APUESTA A LA SUBIDA"  # O "APUESTA A LA BAJA"
-        
-        # Asignamos el emoji según la dirección
-        if "SUBIDA" in accion.upper():
-            icono = "🟢"
-        else:
-            icono = "🔴"
-        
-        mensaje_final = (
-            f"🚨 **SEÑAL DE OPCIONES BINARIAS** 🚨\n"
-            f"🪙 Activo: {activo}\n"
-            f"⏱️ Momento de entrada: {momento_entrada}\n"
-            f"{icono} Acción: {accion}"
-        )
-        
-        bot.send_message(CHAT_ID, mensaje_final, parse_mode="Markdown")
-        print("[2] Señal exacta enviada a Telegram.")
-        
-        # Pausa para dejar pasar el minuto actual
-        time.sleep(10)
+@app.route('/')
+def home():
+  return '¡El bot de señales está activo y funcionando!'
 
-    # El bot revisa el reloj cada segundo
-    time.sleep(1)
+
+def run():
+  port = int(os.environ.get('PORT', 8080))
+  app.run(host='0.0.0.0', port=port)
+
+
+def keep_alive():
+  t = Thread(target=run)
+  t.start()
+
+
+# 2. Función para formatear y enviar la señal con la estructura solicitada
+def enviar_senal(chat_id, direccion, tiempo):
+  # Obtener la hora actual de Venezuela (o ajusta la zona horaria que prefieras)
+  tz = pytz.timezone('America/Caracas')
+  hora_actual = datetime.now(tz).strftime('%I:%M %p')
+
+  # Definir emoji y texto según si es a la baja o a la subida
+  if direccion.lower() == 'subida':
+    emoji_dir = '🟢'
+    accion = '¡Apuesta a la Subida grande!'
+  else:
+    emoji_dir = '🔴'
+    accion = '¡Apuesta a la Baja grande!'
+
+  # Estructura del mensaje sin "Atención papá", solo emojis y datos
+  mensaje = (
+      f'🚨 📉📈 🚨\n\n'
+      f'{emoji_dir} **{accion}** {emoji_dir}\n'
+      f'⏱️ **Tiempo:** {tiempo}\n'
+      f'⏰ **Hora:** {hora_actual}'
+  )
+
+  bot.send_message(chat_id, mensaje, parse_mode='Markdown')
+
+
+# 3. Comandos de prueba en Telegram
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+  bot.reply_to(
+      message,
+      '¡Hola! El bot de trading está en línea. Usa /senal subida 1M o'
+      ' /senal baja 5M para probar.',
+  )
+
+
+@bot.message_handler(commands=['senal'])
+def handle_senal(message):
+  try:
+    # Ejemplo de uso: /senal subida 1M o /senal baja 5M
+    partes = message.text.split()
+    direccion = partes[1]  # subida o baja
+    tiempo = partes[2]  # ej: 1M, 5M
+    enviar_senal(message.chat.id, direccion, tiempo)
+  except Exception as e:
+    bot.reply_to(
+        message,
+        'Uso correcto: `/senal subida 1M` o `/senal baja 5M`',
+        parse_mode='Markdown',
+    )
+
+
+# 4. Punto de entrada principal
+if __name__ == '__main__':
+  # Inicia el servidor web en segundo plano para abrir el puerto en Render
+  keep_alive()
+
+  # Inicia el bot de Telegram en bucle continuo
+  print('Iniciando bot de Telegram y servidor web...')
+  bot.infinity_polling()
