@@ -6,7 +6,8 @@ from flask import Flask
 import telebot
 
 # Configura tu token de Telegram aquí
-TOKEN = '2140660100'
+TOKEN = '8836340643:AAEq-FgcW6JZU-3-XouhUzBFjleGB-X8Sj8'
+CHAT_ID = "2140660100"
 bot = telebot.TeleBot(TOKEN)
 
 # 1. Configurar mini servidor web con Flask para Render y UptimeRobot
