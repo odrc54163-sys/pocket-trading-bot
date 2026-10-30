@@ -7,18 +7,18 @@ from flask import Flask
 import pandas as pd
 import telebot
 import yfinance as yf
-Zy
-TOKEN = "8836340643:AAGDEy9Q-4KRpjPuyiiFLtsQcmdZPlFI2PY"
-CHAT_ID = "2140660100"
+
+TOKEN = '8836340643:AAELtdRqcjPzL60PG1JBZy32TwWy0cVMF5Q'
+CHAT_ID = '2140660100'
 bot = telebot.TeleBot(TOKEN)
 
-# 1. Servidor web para mantener activo el bot en Render
+# 1. Servidor web para mantener el bot activo en Render
 app = Flask('')
 
 
 @app.route('/')
 def home():
-  return '¡El bot multimoneda está activo!'
+  return '¡El bot de señales multimoneda está activo!'
 
 
 def run():
@@ -31,23 +31,20 @@ def keep_alive():
   t.start()
 
 
-# 2. Función que calcula automáticamente el minuto y segundo exacto de entrada
+# 2. Función con el formato exacto del mensaje (limpio y directo)
 def enviar_senal(chat_id, activo, direccion, tiempo):
   tz = pytz.timezone('America/Caracas')
   ahora = datetime.now(tz)
 
-  # Calcular automáticamente el siguiente minuto múltiplo de 5 para la vela
+  # Calcular el siguiente minuto múltiplo de 5 para la vela exacta
   minuto_actual = ahora.minute
   resto = minuto_actual % 5
   minutos_a_sumar = 5 - resto if resto != 0 else 5
 
-  # Siguiente tiempo exacto de entrada (con segundos en 00)
   siguiente_tiempo = ahora.replace(
       second=0, microsecond=0
   ) + timedelta(minutes=minutos_a_sumar)
   hora_entrada = f"{siguiente_tiempo.strftime('%I').lstrip('0')}:{siguiente_tiempo.strftime('%M:%S %p')}"
-
-  # Hora en que se mandó el mensaje
   hora_envio = f"{ahora.strftime('%I').lstrip('0')}:{ahora.strftime('%M %p')}"
 
   if direccion.lower() == 'subida':
@@ -69,7 +66,7 @@ def enviar_senal(chat_id, activo, direccion, tiempo):
   bot.send_message(chat_id, mensaje, parse_mode='Markdown')
 
 
-# 3. Cálculo matemático interno del bot (RSI)
+# 3. Cálculo matemático del RSI
 def calcular_rsi(data, window=14):
   delta = data['Close'].diff()
   gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
@@ -79,8 +76,9 @@ def calcular_rsi(data, window=14):
   return rsi
 
 
-# 4. Analizador automático de múltiples monedas
+# 4. Analizador que recorre todas las monedas de la lista de forma rotativa
 def analizar_mercado():
+  # Aquí tienes todas las principales monedas listas para ser escaneadas
   pares = {
       'EURUSD=X': 'EURUSD',
       'GBPUSD=X': 'GBPUSD',
@@ -91,7 +89,7 @@ def analizar_mercado():
       'GBPJPY=X': 'GBPJPY',
   }
 
-  time.sleep(15)
+  time.sleep(10)
 
   while True:
     for ticker, nombre in pares.items():
@@ -106,19 +104,21 @@ def analizar_mercado():
 
           if ultimo_rsi < 30:
             enviar_senal(CHAT_ID, nombre, 'subida', '5M')
-            time.sleep(300)
+            time.sleep(300)  # Pausa de 5 min para este par tras dar señal
 
           elif ultimo_rsi > 70:
             enviar_senal(CHAT_ID, nombre, 'baja', '5M')
             time.sleep(300)
 
-        time.sleep(10)
+        # Pausa corta entre cada moneda para evitar bloqueos en las peticiones
+        time.sleep(6)
 
       except Exception as e:
         print(f'Error en {nombre}: {e}')
         time.sleep(5)
 
-    time.sleep(30)
+    # Pausa antes de volver a empezar la ronda con todas las monedas
+    time.sleep(15)
 
 
 # 5. Inicio del programa principal
@@ -130,5 +130,5 @@ if __name__ == '__main__':
   hilo_analisis.start()
 
   bot.remove_webhook()
-  print('Iniciando bot analista multimoneda y servidor web...')
+  print('Iniciando bot con todas las monedas y formato limpio...')
   bot.infinity_polling()
